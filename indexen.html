@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Editor</title>
+    <!-- Google Fonts (can be removed if no custom fonts desired for plain look) -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* Removed cyberpunk root colors */
+        :root {
+            /* Neutral/Plain Colors for general theme */
+            --bg-plain-light: #f0f0f0; /* Very light grey for body */
+            --bg-plain-mid: #ffffff;   /* White for main container */
+            --text-plain-dark: #333;    /* Dark grey for text */
+
+            /* Keeping some neon-ish accents for controls as user implied only background removed */
+            --neon-blue: #007bff; /* Standard blue for contrast */
+            --neon-magenta: #8a2be2; /* Blue violet for contrast */
+            --neon-green: #28a745; /* Standard green for contrast */
+            --border-plain: #ccc; /* Light grey border */
+            --shadow-plain: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: Arial, sans-serif; /* Changed font to a common one */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 25px;
+            background-color: var(--bg-plain-light); /* Plain light background */
+            background-image: none; /* Removed background image */
+            color: var(--text-plain-dark); /* Dark text for light background */
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+            background-color: var(--bg-plain-mid); /* Plain white background */
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-plain); /* Plain shadow */
+            border: 1px solid var(--border-plain); /* Plain border */
+            width: 100%;
+            max-width: 1000px;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+        }
+        .container::before { /* Removed cyberpunk pattern overlay */
+            content: none; /* Remove the pseudo-element */
+        }
+        h1 {
+            font-family: Arial, sans-serif; /* Changed font */
+            color: var(--text-plain-dark); /* Dark color for heading */
+            text-shadow: none; /* Removed text shadow */
+            margin-bottom: 15px;
+            font-size: 2.5em;
+            text-transform: none; /* Removed uppercase */
+            letter-spacing: normal;
+        }
+        #drop-area {
+            width: 100%;
+            height: 180px;
+            border: 3px dashed var(--border-plain); /* Plain border */
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.3em;
+            color: var(--text-plain-dark); /* Plain color */
+            cursor: pointer;
+            transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+            background-color: rgba(0,0,0,0.05); /* Slightly visible */
+            text-align: center;
+            user-select: none;
+            margin-bottom: 20px;
+            text-shadow: none; /* Removed text shadow */
+            position: relative; 
+            z-index: 2;
+        }
+        #drop-area.highlight {
+            border-color: var(--neon-blue); /* Kept blue highlight for functionality */
+            background-color: rgba(0,0,0,0.1);
+            box-shadow: 0 0 10px rgba(0,123,255,0.5); /* Plain highlight shadow */
+        }
+
+        /* Main editor layout - No changes needed here for general look */
+        .editor-layout {
+            display: flex;
+            flex-direction: row;
+            gap: 30px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Image preview container */
+        #image-preview-container {
+            perspective: 1000px; /* Kept for 3D effect */
+            position: relative;
+            flex: 1;
+            min-width: 350px;
+            max-width: 600px;
+            min-height: 350px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background-color: transparent; /* Crucial for transparent save */
+            /* Removed border and box-shadow for truly blank background when adjusting transparency */
+        }
+
+        /* New wrapper for position (translation) - No visual changes here */
+        #image-position-wrapper {
+            transition: transform 0.1s ease-out;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Image's 3D rotation and scale wrapper - No visual changes here */
+        #image-wrapper {
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+        #image-preview {
+            max-width: 100%;
+            max-height: 100%;
+            display: none;
+            opacity: 1;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.2); /* Changed image glow to plain shadow */
+        }
+
+        /* Controls sidebar */
+        .controls-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 280px;
+            max-width: 350px;
+            background-color: var(--bg-plain-mid); /* Plain background */
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: var(--shadow-plain); /* Plain shadow */
+            border: 1px solid var(--border-plain); /* Plain border */
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .control-group label {
+            min-width: 80px;
+            font-weight: bold;
+            color: var(--text-plain-dark); /* Plain text color */
+            font-size: 1em;
+            text-shadow: none; /* Removed text shadow */
+        }
+        .control-group input[type="range"] {
+            flex-grow: 1;
+            height: 10px;
+            /* Kept gradient for sliders as requested in previous versions */
+            background: linear-gradient(to right, var(--neon-blue), var(--neon-magenta)); 
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.8;
+            transition: opacity 0.3s ease-in-out, box-shadow 0.3s ease-in-out; 
+            -webkit-appearance: none;
+            appearance: none;
+            box-shadow: 0 0 5px rgba(0,123,255,0.3); /* Plain shadow */
+        }
+        .control-group input[type="range"]:hover {
+            opacity: 1;
+            box-shadow: 0 0 12px var(--neon-blue); 
+        }
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            background: var(--neon-blue); /* Plain thumb color */
+            cursor: grab;
+            border-radius: 50%;
+            border: 2px solid var(--bg-plain-mid);
+            box-shadow: 0 0 8px rgba(0,123,255,0.5); /* Plain shadow */
+            transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease; 
+        }
+        .control-group input[type="range"]::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            background: var(--neon-magenta); /* Plain active color */
+            box-shadow: 0 0 12px rgba(138,43,226,0.8); /* Plain active shadow */
+            transform: scale(1.1);
+        }
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            background: var(--neon-blue); /* Plain thumb color */
+            cursor: grab;
+            border-radius: 50%;
+            border: 2px solid var(--bg-plain-mid);
+            box-shadow: 0 0 8px rgba(0,123,255,0.5); /* Plain shadow */
+            transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease; 
+        }
+        .control-group input[type="range"]::-moz-range-thumb:active {
+            cursor: grabbing;
+            background: var(--neon-magenta); /* Plain active color */
+            box-shadow: 0 0 12px rgba(138,43,226,0.8); /* Plain active shadow */
+            transform: scale(1.1);
+        }
+        .control-group span.value-display {
+            min-width: 55px;
+            text-align: right;
+            font-weight: bold;
+            color: var(--text-plain-dark); /* Plain text color */
+            white-space: nowrap;
+            text-shadow: none; /* Removed text shadow */
+        }
+        button {
+            font-family: Arial, sans-serif; /* Changed font */
+            padding: 14px 30px;
+            background-color: var(--neon-green); /* Standard green button */
+            color: white;
+            border: none; /* Removed border */
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease, color 0.3s ease;
+            width: 100%;
+            max-width: 250px;
+            align-self: center;
+            margin-top: 25px;
+            box-shadow: var(--shadow-plain); /* Plain shadow */
+            text-shadow: none; /* Removed text shadow */
+            text-transform: none; /* Removed uppercase */
+            letter-spacing: normal;
+        }
+        button:hover {
+            background-color: #218838; /* Darker green on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2); /* Stronger plain shadow */
+            color: white;
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        button:disabled {
+            background-color: #cccccc;
+            border-color: #cccccc;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+            text-shadow: none;
+        }
+        #status-message {
+            margin-top: 15px;
+            font-size: 1.05em;
+            color: var(--text-plain-dark); /* Plain text color */
+            font-weight: bold;
+            text-align: center;
+            text-shadow: none; /* Removed text shadow */
+        }
+        .footer-text {
+            margin-top: 40px;
+            font-size: 0.9em;
+            text-align: center;
+            color: var(--text-plain-dark); /* Plain text color */
+        }
+        .footer-text p {
+            margin: 5px 0;
+        }
+        .quote {
+            font-style: italic;
+            color: var(--text-plain-dark); /* Plain text color */
+            text-shadow: none; /* Removed text shadow */
+        }
+        .attribution {
+            color: var(--text-plain-dark); /* Plain text color */
+        }
+
+        /* Responsive adjustments - No changes needed for general look */
+        @media (max-width: 850px) {
+            .editor-layout {
+                flex-direction: column;
+                align-items: center;
+            }
+            .controls-sidebar {
+                width: 100%;
+                max-width: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Editor</h1>
+
+        <div id="drop-area">
+            <p>Drag & Drop Image File Here, or Click to Upload</p>
+            <input type="file" id="file-input" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="editor-layout">
+            <!-- Image Preview Area -->
+            <div id="image-preview-container">
+                <!-- New wrapper for position (translation) -->
+                <div id="image-position-wrapper">
+                    <!-- Image's 3D rotation and scale wrapper -->
+                    <div id="image-wrapper">
+                        <img id="image-preview" src="#" alt="Image Preview">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Panel Sidebar -->
+            <div class="controls-sidebar">
+                <div class="control-group">
+                    <label for="opacity-slider">Opacity:</label>
+                    <input type="range" id="opacity-slider" min="0" max="1" step="0.01" value="1">
+                    <span id="opacity-value" class="value-display">100 %</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="size-slider">Image Scale:</label>
+                    <input type="range" id="size-slider" min="10" max="200" step="1" value="100">
+                    <span id="size-value" class="value-display">100 %</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="translate-x-slider">X-Offset:</label>
+                    <input type="range" id="translate-x-slider" min="-200" max="200" step="1" value="0">
+                    <span id="translate-x-value" class="value-display">0 px</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="translate-y-slider">Y-Offset:</label>
+                    <input type="range" id="translate-y-slider" min="-200" max="200" step="1" value="0">
+                    <span id="translate-y-value" class="value-display">0 px</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="rotate-x-slider">Rotate X:</label>
+                    <input type="range" id="rotate-x-slider" min="-180" max="180" step="1" value="0">
+                    <span id="rotate-x-value" class="value-display">0 °</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="rotate-y-slider">Rotate Y:</label>
+                    <input type="range" id="rotate-y-slider" min="-180" max="180" step="1" value="0">
+                    <span id="rotate-y-value" class="value-display">0 °</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="rotate-z-slider">Rotate Z:</label>
+                    <input type="range" id="rotate-z-slider" min="-180" max="180" step="1" value="0">
+                    <span id="rotate-z-value" class="value-display">0 °</span>
+                </div>
+            </div>
+        </div>
+
+        <button id="save-button" disabled>Capture & Download (Transparent BG)</button>
+        <p id="status-message"></p>
+    </div>
+
+    <div class="footer-text">
+        <p class="quote">
+            "I'd rather have loyalty than love<br>
+            'Cause love really don't mean jack<br>
+            See love is just a feeling<br>
+            You can love somebody and still stab them in the back"
+        </p>
+        <p class="attribution">— Savage Mode</p>
+        <p>Copyright: EzraKnotLab</p>
+    </div>
+
+    <!-- Include html2canvas library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        // Get all necessary DOM elements
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePositionWrapper = document.getElementById('image-position-wrapper'); // New position wrapper
+        const imageWrapper = document.getElementById('image-wrapper');
+        const imagePreview = document.getElementById('image-preview');
+
+        const opacitySlider = document.getElementById('opacity-slider');
+        const opacityValueSpan = document.getElementById('opacity-value');
+
+        const sizeSlider = document.getElementById('size-slider');
+        const sizeValueSpan = document.getElementById('size-value');
+
+        const translateXSlider = document.getElementById('translate-x-slider');
+        const translateYSlider = document.getElementById('translate-y-slider');
+        const translateXValueSpan = document.getElementById('translate-x-value');
+        const translateYValueSpan = document.getElementById('translate-y-value');
+
+        const rotateXSlider = document.getElementById('rotate-x-slider');
+        const rotateYSlider = document.getElementById('rotate-y-slider');
+        const rotateZSlider = document.getElementById('rotate-z-slider');
+        const rotateXValueSpan = document.getElementById('rotate-x-value');
+        const rotateYValueSpan = document.getElementById('rotate-y-value');
+        const rotateZValueSpan = document.getElementById('rotate-z-value');
+
+        const saveButton = document.getElementById('save-button');
+        const statusMessage = document.getElementById('status-message');
+
+        let currentImageFile = null;
+        let originalImageSrc = null;
+
+        // --- Drag and Drop / File Selection ---
+        dropArea.addEventListener('click', () => fileInput.click());
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+        });
+        dropArea.addEventListener('drop', handleDrop, false);
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length === 0) {
+                statusMessage.textContent = 'Please select an image file.';
+                return;
+            }
+            const file = files.item(0);
+            if (!file.type.startsWith('image/')) {
+                statusMessage.textContent = 'Only image files are supported.';
+                return;
+            }
+
+            currentImageFile = file;
+            statusMessage.textContent = '';
+            saveButton.disabled = false;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalImageSrc = e.target.result;
+
+                imagePreview.onload = function() {
+                    imagePreview.style.display = 'block';
+                    
+                    // Reset all controls to default values
+                    opacitySlider.value = 1;
+                    sizeSlider.value = 100;
+                    translateXSlider.value = 0;
+                    translateYSlider.value = 0;
+                    rotateXSlider.value = 0;
+                    rotateYSlider.value = 0;
+                    rotateZSlider.value = 0;
+
+                    // Update styles immediately after image load and reset
+                    updateImageStyles();
+                };
+                imagePreview.src = originalImageSrc;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- Function to update all image styles ---
+        function updateImageStyles() {
+            // Opacity
+            const opacity = parseFloat(opacitySlider.value);
+            imagePreview.style.opacity = opacity;
+            opacityValueSpan.textContent = `${(opacity * 100).toFixed(0)} %`;
+
+            // Image Scale (applied to image-wrapper)
+            const sizePercentage = parseFloat(sizeSlider.value);
+            sizeValueSpan.textContent = `${sizePercentage} %`;
+
+            // Translation (applied to image-position-wrapper)
+            const translateX = parseFloat(translateXSlider.value);
+            const translateY = parseFloat(translateYSlider.value);
+            translateXValueSpan.textContent = `${translateX} px`;
+            translateYValueSpan.textContent = `${translateY} px`;
+
+            // 3D Rotation (applied to image-wrapper)
+            const rotateX = parseFloat(rotateXSlider.value);
+            const rotateY = parseFloat(rotateYSlider.value);
+            const rotateZ = parseFloat(rotateZSlider.value);
+
+            // Apply translation to the position wrapper
+            imagePositionWrapper.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`;
+
+            // Apply scale and rotation to the image wrapper
+            imageWrapper.style.transform =
+                `scale(${sizePercentage / 100}) ` +
+                `rotateX(${rotateX}deg) ` +
+                `rotateY(${rotateY}deg) ` +
+                `rotateZ(${rotateZ}deg)`;
+
+            // Update rotation value displays
+            rotateXValueSpan.textContent = `${rotateX} °`;
+            rotateYValueSpan.textContent = `${rotateY} °`;
+            rotateZValueSpan.textContent = `${rotateZ} °`;
+        }
+
+        // --- Event Listeners for all sliders ---
+        opacitySlider.addEventListener('input', updateImageStyles);
+        sizeSlider.addEventListener('input', updateImageStyles);
+        translateXSlider.addEventListener('input', updateImageStyles);
+        translateYSlider.addEventListener('input', updateImageStyles);
+        rotateXSlider.addEventListener('input', updateImageStyles);
+        rotateYSlider.addEventListener('input', updateImageStyles);
+        rotateZSlider.addEventListener('input', updateImageStyles);
+
+        // --- Save Image Functionality ---
+        saveButton.addEventListener('click', () => {
+            console.log('Save button click detected!'); // Debugging point 1
+
+            if (!currentImageFile) {
+                statusMessage.textContent = 'Please drag & drop or select an image first.';
+                console.log('No image file loaded. Aborting save.');
+                return;
+            }
+
+            statusMessage.textContent = 'Capturing image effects...';
+            saveButton.disabled = true;
+            console.log('Attempting html2canvas capture on:', imagePreviewContainer); // Debugging point 2
+
+            html2canvas(imagePreviewContainer, {
+                useCORS: true,
+                scale: 2, // Increase resolution for sharper output
+                backgroundColor: null // Crucial: Set to null to ensure transparent background capture
+            }).then(canvas => {
+                console.log('html2canvas capture successful! Canvas:', canvas); // Debugging point 3
+                statusMessage.textContent = 'Saving image...';
+
+                const dataURL = canvas.toDataURL('image/png');
+                console.log('Generated Data URL. Length:', dataURL.length); // Debugging point 4
+
+                const a = document.createElement('a');
+                const originalFileName = currentImageFile.name;
+                const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
+
+                const opacity = (parseFloat(opacitySlider.value) * 100).toFixed(0);
+                const size = sizeSlider.value;
+                const translateX = translateXSlider.value;
+                const translateY = translateYSlider.value;
+                const rotateX = rotateXSlider.value;
+                const rotateY = rotateYSlider.value; 
+                const rotateZ = rotateZSlider.value;
+                console.log('Filename parameters:', { opacity, size, translateX, translateY, rotateX, rotateY, rotateZ }); // Debugging point 5
+
+                a.download = `${baseName}_edited_o${opacity}_s${size}_x${rotateX}_y${rotateY}_z${rotateZ}_t${translateX}x${translateY}.png`;
+                a.href = dataURL;
+
+                console.log('Initiating download via a.click()'); // Debugging point 6
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                statusMessage.textContent = 'Image saved successfully!';
+                saveButton.disabled = false;
+                console.log('Download initiated and button re-enabled.');
+            }).catch(error => {
+                console.error('Error capturing or saving image:', error); // Debugging point 7
+                statusMessage.textContent = `Failed to save image: ${error.message || 'Unknown error'}. Check console.`;
+                saveButton.disabled = false;
+            });
+        });
+
+        // Initial state: disable save button
+        saveButton.disabled = true;
+    </script>
+</body>
+</html>
